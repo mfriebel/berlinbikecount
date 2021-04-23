@@ -22,6 +22,11 @@ def station_sheet_to_df(wb, sheetname):
     df = pd.DataFrame(sheet.values)
     df.columns = df.loc[0].values.tolist()
     df.drop(0, inplace=True)
+
+    df['Installationsdatum'] = pd.to_datetime(df['Installationsdatum'], format='%Y-%m-%d %H:%M:%S')
+    df['Breitengrad'] = pd.to_numeric(df['Breitengrad'], errors='ignore')
+    df['Längengrad'] = pd.to_numeric(df['Längengrad'], errors = 'ignore')
+
     return df
 # %%
 def df_to_sql(df,  table_name, host='localhost', db='bikecount'):
@@ -35,21 +40,12 @@ def clean_data(df):
     df['Date'] = pd.to_datetime(df['Date'], format='%Y-%m-%d %H:%M:%S')
 
     return df
-#%%
-wb = openpyxl.load_workbook('./data/gesamtdatei_stundenwerte.xlsx')
-#%%
-wb.get_sheet_names()
-# %%
-df = station_sheet_to_df(wb, 'Standortdaten')
-# %%
-#df = clean_data(df)
-#%%
-df['Installationsdatum'] = pd.to_datetime(df['Installationsdatum'], format='%Y-%m-%d %H:%M:%S')
-#%%
-df['Breitengrad'] = pd.to_numeric(df['Breitengrad'], errors='ignore')
-df['Längengrad'] = pd.to_numeric(df['Längengrad'], errors = 'ignore')
-#%%
-df.isna().sum()
-# %%
-df_to_sql(df, 'Standortdaten')
-# %%
+
+if __name__ == 'main':
+    wb = openpyxl.load_workbook('./data/gesamtdatei_stundenwerte.xlsx')
+    wb.get_sheet_names()
+
+    df = station_sheet_to_df(wb, 'Standortdaten')
+
+    df_to_sql(df, 'standortdaten')
+

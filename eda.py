@@ -20,27 +20,30 @@ count_2020['weekday'] = count_2020.Date.dt.weekday
 count_2020['hour'] = count_2020.Date.dt.hour
 count_2020['week'] = count_2020.Date.dt.isocalendar().week
 # %%
-sheets = wb.sheetnames()
+sheets = wb.sheetnames
 counts_dict = {}
 for sheet in sheets[3:]:
-    counts_dict[sheet[-5:]] = clean_data(count_sheet_to_df(wb, sheet))
+    counts_dict[sheet[-4:]] = clean_data(count_sheet_to_df(wb, sheet))
 # %%
 # %%
-yearly = pd.DataFrame(columns = counts_dict['2020'].columns)
+yearly_dev = pd.DataFrame(columns = counts_dict['2020'].columns)
 # %%
 for key in counts_dict.keys():
     agg_df = counts_dict[key].groupby(counts_dict[key].Date.dt.year, as_index=False).sum()
     agg_df['Date'] = key
-    yearly = yearly.append(agg_df)
+    yearly_dev = yearly_dev.append(agg_df)
 # %%
 
 # %%
-yearly_2020 = count_2020.groupby('year', as_index=False).sum().transpose()
-yearly_2020.columns = ['sum_2020']
-yearly_2020 = yearly_2020.join(stations.set_index('Zählstelle'))
-yearly_2020.reset_index(inplace=True)
+yearly = count_2020.groupby(count_2020.Date.dt.year, as_index=False).sum().transpose()
+yearly.columns = [f'sum{count_2020.Date.dt.year[1]}']
+yearly = yearly.join(stations.set_index('Zählstelle'))
+yearly.index.name = 'Zählstelle'
+yearly.reset_index(inplace=True)
+yearly['Zählstelle_no'] = yearly['Zählstelle'].apply(lambda x: x[0:2])
+
 # %%
-fig = px.scatter_mapbox(yearly_2020, lat="Breitengrad", lon="Längengrad", hover_name="index",
+fig = px.scatter_mapbox(yearly, lat="Breitengrad", lon="Längengrad", hover_name="index",
                             hover_data={
                                 'index' : False,
                                 'Breitengrad': False,

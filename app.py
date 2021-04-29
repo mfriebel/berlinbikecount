@@ -9,6 +9,7 @@ import dash_html_components as html
 import plotly.express as px
 import pandas as pd
 from sqlalchemy import create_engine
+from sqlalchemy import inspect
 
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 
@@ -16,44 +17,88 @@ app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
 
 # assume you have a "long-form" data frame
 # see https://plotly.com/python/px-arguments/ for more options
+HOST = 'localhost'
+DB = 'bikecount'
 
-engine = create_engine('postgres://localhost/bikecount', echo=False)
-query = "SELECT * FROM count_2019;"
-counts = pd.read_sql(query, engine)
+db_engine = create_engine(f'postgres://{HOST}/{DB}', echo=False)
 
-engine = create_engine('postgres://localhost/bikecount', echo=False)
-query = "SELECT * FROM standortdaten;"
-stations = pd.read_sql(query, engine)
+def get_db_tables(engine):
+    inspector = inspect(engine)
+    table_names = inspector.get_table_names()
+    return table_names
 
-yearly_2020 = counts.groupby(counts.Date.dt.year, as_index=False).sum().transpose()
-yearly_2020.columns = ['sum_2020']
-yearly_2020 = yearly_2020.join(stations.set_index('Zählstelle'))
-yearly_2020.reset_index(inplace=True)
+def get_sql_table(engine, table):
+    query = f"SELECT * FROM {table};"
+    table = pd.read_sql(query, engine)
+    return table
 
-fig = px.scatter_mapbox(yearly_2020, lat="Breitengrad", lon="Längengrad", hover_name='level_0',
-                            hover_data={
-                                'level_0' : False,
-                                'Breitengrad': False,
-                                'Längengrad': False,
-                                'sum_2020' : True,
-                                'Beschreibung - Fahrtrichtung': True,
-                                'Installationsdatum': True},
-                            color='level_0', size='sum_2020', size_max=100, zoom=50,
-                            mapbox_style="open-street-map",
-                            height=800)
+tables = get_db_tables(db_engine)
+tables.sort()
+
+yearly_dev = pd.DataFrame(columns=get_sql_table(db_engine, 'count_2020').columns)
+for table in tables[:-1]:
+    df = get_sql_table(db_engine, table)
+    agg_df = df.groupby(df.Date.dt.year, as_index=False).sum()
+    agg_df['Date'] = df.Date.dt.year[1]
+    yearly_dev = yearly_dev.append(agg_df)
+
+yearly_dev.set_index('Date', inplace=True)
+yearly_dev_per = (yearly_dev/yearly_dev.loc[2016])*100
+
+development_fig = px.line(yearly_dev_per.loc[2016:2020])
 
 app.layout = html.Div(children=[
-    html.H1(children='Hello Dash'),
+    html.H1(children='Berlin Bike Count'),
 
     html.Div(children='''
-        Dash: A web application framework for Python.
+        Automatische Fahrradzählung Berlin.
     '''),
 
+    html.Div([dcc.Dropdown(
+        id='table_selection',
+        options=[
+            {'label': y, 'value': y} for y in tables],
+        value='count_2020')], style = {'width' : '30%', 'padding' : 10}),
+
     dcc.Graph(
-        id='example-graph',
-        figure=fig
+        id='station_map'),
+
+    dcc.Graph(
+        id='development',
+        figure = development_fig
     )
 ])
+
+
+@app.callback(
+    dash.dependencies.Output('station_map', 'figure'),
+   [dash.dependencies.Input('table_selection', 'value')])
+
+def update_fig(value, engine=db_engine):
+    counts = get_sql_table(engine, value)
+    stations = get_sql_table(engine, 'standortdaten')
+    yearly = counts.groupby(counts.Date.dt.year, as_index=False).sum().transpose()
+    yearly.columns = ['Radfahrer_pro_Jahr']
+    yearly = yearly.join(stations.set_index('Zählstelle'))
+    yearly.index.name = 'Zählstelle'
+    yearly.reset_index(inplace=True)
+    yearly['Zählstelle_no'] = yearly['Zählstelle'].apply(lambda x: x[0:2])
+    
+
+    figure = px.scatter_mapbox(yearly, lat="Breitengrad", lon="Längengrad", hover_name='Zählstelle',
+                            hover_data={
+                                'Zählstelle' : False,
+                                'Zählstelle_no': False,
+                                'Breitengrad': False,
+                                'Längengrad': False,
+                                'Radfahrer_pro_Jahr' : True,
+                                'Beschreibung - Fahrtrichtung': True,
+                                'Installationsdatum': False},
+                            color='Zählstelle_no', size='Radfahrer_pro_Jahr', size_max=30, zoom=10,
+                            mapbox_style="open-street-map",
+                            height=700)
+    
+    return figure
 
 if __name__ == '__main__':
     app.run_server(debug=True)

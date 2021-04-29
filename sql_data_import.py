@@ -8,7 +8,7 @@ import seaborn as sns
 # %%
 def count_sheet_to_df(wb, sheetname):
 
-    sheet = wb.get_sheet_by_name(sheetname)
+    sheet = wb[sheetname]
     df = pd.DataFrame(sheet.values)
     header = [x.split()[0] for x in df.loc[0].values.tolist()]
     header[0] = 'Date'
@@ -18,7 +18,7 @@ def count_sheet_to_df(wb, sheetname):
     return df
 
 def station_sheet_to_df(wb, sheetname):
-    sheet = wb.get_sheet_by_name(sheetname)
+    sheet = wb[sheetname]
     df = pd.DataFrame(sheet.values)
     df.columns = df.loc[0].values.tolist()
     df.drop(0, inplace=True)
@@ -34,18 +34,22 @@ def df_to_sql(df,  table_name, host='localhost', db='bikecount'):
     df.to_sql(table_name, engine, method='multi', chunksize=1000)
     
 def clean_data(df):
-    df = df.copy()
     df.iloc[:, 1:].replace([None], np.nan, inplace=True)
     df = df.apply(pd.to_numeric, downcast='signed', errors='ignore')
     df['Date'] = pd.to_datetime(df['Date'], format='%Y-%m-%d %H:%M:%S')
+    df.set_index('Date', inplace=True)
 
     return df
 
-if __name__ == 'main':
+if __name__ == '__main__':
     wb = openpyxl.load_workbook('./data/gesamtdatei_stundenwerte.xlsx')
-    wb.get_sheet_names()
+    sheets = wb.sheetnames
 
-    df = station_sheet_to_df(wb, 'Standortdaten')
+    station = station_sheet_to_df(wb, 'Standortdaten')
+    df_to_sql(station, 'standortdaten')
 
-    df_to_sql(df, 'standortdaten')
+    counts_dict = {}
+    for sheet in sheets[3:]:
+        df_to_sql(clean_data(count_sheet_to_df(wb, sheet)), f'count_{sheet[-4:]}')
+
 

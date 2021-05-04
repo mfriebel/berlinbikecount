@@ -10,8 +10,8 @@ def count_sheet_to_df(wb, sheetname):
 
     sheet = wb[sheetname]
     df = pd.DataFrame(sheet.values)
-    header = [x.split()[0] for x in df.loc[0].values.tolist()]
-    header[0] = 'Date'
+    header = [x.split()[0].replace('-', '_') for x in df.loc[0].values.tolist()]
+    header[0] = 'date'
     df.columns = header
     df.drop(0, inplace=True)
 
@@ -20,12 +20,13 @@ def count_sheet_to_df(wb, sheetname):
 def station_sheet_to_df(wb, sheetname):
     sheet = wb[sheetname]
     df = pd.DataFrame(sheet.values)
-    df.columns = df.loc[0].values.tolist()
+    df.columns = [x.lower() for x in df.loc[0].values.tolist()]
     df.drop(0, inplace=True)
 
-    df['Installationsdatum'] = pd.to_datetime(df['Installationsdatum'], format='%Y-%m-%d %H:%M:%S')
-    df['Breitengrad'] = pd.to_numeric(df['Breitengrad'], errors='ignore')
-    df['Längengrad'] = pd.to_numeric(df['Längengrad'], errors = 'ignore')
+    df['installationsdatum'] = pd.to_datetime(df['installationsdatum'], format='%Y-%m-%d %H:%M:%S')
+    df['breitengrad'] = pd.to_numeric(df['breitengrad'], errors='ignore')
+    df['längengrad'] = pd.to_numeric(df['längengrad'], errors = 'ignore')
+    df['zählstelle'] = df['zählstelle'].apply(lambda x: x.replace('-','_'))
 
     return df
 # %%
@@ -36,8 +37,8 @@ def df_to_sql(df,  table_name, host='localhost', db='bikecount'):
 def clean_data(df):
     df.iloc[:, 1:].replace([None], np.nan, inplace=True)
     df = df.apply(pd.to_numeric, downcast='signed', errors='ignore')
-    df['Date'] = pd.to_datetime(df['Date'], format='%Y-%m-%d %H:%M:%S')
-    df.set_index('Date', inplace=True)
+    df['date'] = pd.to_datetime(df['date'], format='%Y-%m-%d %H:%M:%S')
+    df.set_index('date', inplace=True)
 
     return df
 

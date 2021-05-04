@@ -39,10 +39,10 @@ yearly_dev = pd.DataFrame(columns=get_sql_table(db_engine, 'count_2020').columns
 for table in tables[:-1]:
     df = get_sql_table(db_engine, table)
     agg_df = df.groupby(df.Date.dt.year, as_index=False).sum()
-    agg_df['Date'] = df.Date.dt.year[1]
+    agg_df['date'] = df.Date.dt.year[1]
     yearly_dev = yearly_dev.append(agg_df)
 
-yearly_dev.set_index('Date', inplace=True)
+yearly_dev.set_index('date', inplace=True)
 yearly_dev_per = (yearly_dev/yearly_dev.loc[2016])*100
 
 development_fig = px.line(yearly_dev_per.loc[2016:2020])
@@ -79,22 +79,22 @@ def update_fig(value, engine=db_engine):
     stations = get_sql_table(engine, 'standortdaten')
     yearly = counts.groupby(counts.Date.dt.year, as_index=False).sum().transpose()
     yearly.columns = ['Radfahrer_pro_Jahr']
-    yearly = yearly.join(stations.set_index('Zählstelle'))
-    yearly.index.name = 'Zählstelle'
+    yearly = yearly.join(stations.set_index('zählstelle'))
+    yearly.index.name = 'zählstelle'
     yearly.reset_index(inplace=True)
-    yearly['Zählstelle_no'] = yearly['Zählstelle'].apply(lambda x: x[0:2])
+    yearly['zählstelle_no'] = yearly['zählstelle'].apply(lambda x: x[0:2])
     
 
-    figure = px.scatter_mapbox(yearly, lat="Breitengrad", lon="Längengrad", hover_name='Zählstelle',
+    figure = px.scatter_mapbox(yearly, lat="breitengrad", lon="längengrad", hover_name='zählstelle',
                             hover_data={
-                                'Zählstelle' : False,
-                                'Zählstelle_no': False,
-                                'Breitengrad': False,
-                                'Längengrad': False,
+                                'zählstelle' : False,
+                                'zählstelle_no': False,
+                                'breitengrad': False,
+                                'längengrad': False,
                                 'Radfahrer_pro_Jahr' : True,
-                                'Beschreibung - Fahrtrichtung': True,
-                                'Installationsdatum': False},
-                            color='Zählstelle_no', size='Radfahrer_pro_Jahr', size_max=30, zoom=10,
+                                'beschreibung - fahrtrichtung': True,
+                                'installationsdatum': False},
+                            color='zählstelle_no', size='Radfahrer_pro_Jahr', size_max=30, zoom=10,
                             mapbox_style="open-street-map",
                             height=700)
     

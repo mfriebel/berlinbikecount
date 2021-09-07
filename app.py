@@ -7,6 +7,7 @@ import dash
 import dash_core_components as dcc
 import dash_html_components as html
 import plotly.express as px
+import plotly.graph_objects as go
 import pandas as pd
 from sqlalchemy import create_engine
 from sqlalchemy import inspect
@@ -38,15 +39,52 @@ tables.sort()
 yearly_dev = pd.DataFrame(columns=get_sql_table(db_engine, 'count_2020').columns)
 for table in tables[:-1]:
     df = get_sql_table(db_engine, table)
-    agg_df = df.groupby(df.Date.dt.year, as_index=False).sum()
-    agg_df['date'] = df.Date.dt.year[1]
+    agg_df = df.groupby(df.date.dt.year, as_index=False).sum()
+    agg_df['date'] = df.date.dt.year[1]
     yearly_dev = yearly_dev.append(agg_df)
 
 yearly_dev.set_index('date', inplace=True)
-yearly_dev_per = (yearly_dev/yearly_dev.loc[2016])*100
+yearly_dev = yearly_dev.transpose()
 
-development_fig = px.line(yearly_dev_per.loc[2016:2020])
+development_fig = go.Figure()
 
+for time_span in range(2015, 2021):
+    development_fig.add_trace(go.Bar(x=yearly_dev.index, y=yearly_dev[time_span], name='Yearly Bike counts'))
+
+sliders = [
+    {'steps': [
+        {'method': 'update', 'label': '2015', 
+        'args' : [{'visible': [True,  False, False, False,  False, False]}]},
+        {'method': 'update', 'label': '2016', 
+        'args' : [{'visible': [False,  True, False, False,  False, False]}]},
+        {'method': 'update', 'label': '2017', 
+        'args' : [{'visible': [False,  False, True, False,  False, False]}]},
+        {'method': 'update', 'label': '2018', 
+        'args' : [{'visible': [False,  False, False, True,  False, False]}]},
+        {'method': 'update', 'label': '2019', 
+        'args' : [{'visible': [False,  False, False, False,  True, False]}]},
+        {'method': 'update', 'label': '2020', 
+        'args' : [{'visible': [False, False,  False, False, False, True]}]}
+        ]}
+]
+
+# Hide traces for other time intervals than 2019
+development_fig.data[1].visible=False
+development_fig.data[2].visible=False
+development_fig.data[3].visible=False
+development_fig.data[4].visible=False
+development_fig.data[5].visible=False
+
+
+# Set layout with sliders included
+development_fig.update_layout({
+    'showlegend':False,
+    'title': {'text': "Yearly bike counts per station 2015-2021"},
+    'xaxis': {'title':'Station'},
+    'yaxis': {'title':'Counts', 'range':[0, 2000000]},
+    'sliders' : sliders
+    })
+    
 app.layout = html.Div(children=[
     html.H1(children='Berlin Bike Count'),
 
@@ -77,7 +115,7 @@ app.layout = html.Div(children=[
 def update_fig(value, engine=db_engine):
     counts = get_sql_table(engine, value)
     stations = get_sql_table(engine, 'standortdaten')
-    yearly = counts.groupby(counts.Date.dt.year, as_index=False).sum().transpose()
+    yearly = counts.groupby(counts.date.dt.year, as_index=False).sum().transpose()
     yearly.columns = ['Radfahrer_pro_Jahr']
     yearly = yearly.join(stations.set_index('zählstelle'))
     yearly.index.name = 'zählstelle'
